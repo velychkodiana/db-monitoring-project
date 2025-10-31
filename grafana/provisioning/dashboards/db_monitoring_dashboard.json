@@ -1,0 +1,18 @@
+{
+  "id": null,
+  "title": "DB Monitoring Dashboard",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Operation Duration (ms)",
+      "targets": [
+        {
+          "expr": "operation_duration_ms",
+          "legendFormat": "duration"
+        }
+      ],
+      "datasource": "Prometheus"
+    }
+  ]
+}

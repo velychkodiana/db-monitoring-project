@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Встановлюємо залежності
+RUN pip install psycopg2-binary prometheus_client
+
+# Копіюємо код генератора
+COPY generator.py /app/
+
+# Відкриваємо порт метрик для Prometheus
+EXPOSE 9100
+
+# Запускаємо генератор
+CMD ["python", "generator.py"]
