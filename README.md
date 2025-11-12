@@ -166,18 +166,15 @@ scrape_configs:
 ![Prometheus Targets](screenshots/prometheus.png)
 ```
 
----
-
 ## Виконані умови
-```
+
 ✅ Контейнери PostgreSQL, Prometheus, Grafana, Auth Service, Generator
 ✅ Prometheus збирає всі метрики
 ✅ Grafana показує 4+ графіки у дашборді
 ✅ Дані оновлюються в реальному часі
 ✅ Моніторинг охоплює логіни, користувачів, операції та стан БД
-```
----
 
+---
 **Автор:** *Diana Velycho*
 **Рік:** 2025
 
