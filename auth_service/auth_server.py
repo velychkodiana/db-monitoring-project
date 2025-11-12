@@ -1,65 +1,62 @@
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 import sqlite3
-import datetime
+from prometheus_client import start_http_server, Counter, Gauge
+import time
 
 app = Flask(__name__)
-app.config["JWT_SECRET_KEY"] = "super-secret-key"  # Замінити у продакшн
+app.config["JWT_SECRET_KEY"] = "supersecret"
 jwt = JWTManager(app)
 
-# --- Ініціалізація БД ---
-def init_db():
+# Prometheus Metrics
+login_attempts = Counter("auth_login_attempts_total", "Total login attempts")
+successful_logins = Counter("auth_successful_logins_total", "Successful logins")
+registered_users_gauge = Gauge("auth_registered_users_total", "Total number of registered users")
+
+
+def get_user_count():
     conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
-        password TEXT
-    )""")
-    conn.commit()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users")
+    count = cur.fetchone()[0]
     conn.close()
+    return count
 
-init_db()
 
-# --- Реєстрація ---
-@app.post("/register")
-def register():
-    data = request.json
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)",
-                       (data["username"], data["password"]))
-        conn.commit()
-        return jsonify({"msg": "User created"}), 201
-    except:
-        return jsonify({"msg": "User already exists"}), 400
-    finally:
-        conn.close()
+@app.before_request
+def update_user_count_metric():
+    registered_users_gauge.set(get_user_count())
 
-# --- Логін ---
-@app.post("/login")
+
+@app.route("/login", methods=["POST"])
 def login():
-    data = request.json
+    login_attempts.inc()
+
+    data = request.get_json()
+    username = data["username"]
+    password = data["password"]
+
     conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username=? AND password=?",
-                   (data["username"], data["password"]))
-    user = cursor.fetchone()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
+    user = cur.fetchone()
     conn.close()
 
     if user:
-        token = create_access_token(identity=data["username"], expires_delta=datetime.timedelta(hours=1))
+        successful_logins.inc()
+        token = create_access_token(identity=username)
         return jsonify(access_token=token)
-    else:
-        return jsonify({"msg": "Invalid credentials"}), 401
 
-# --- Закрита зона ---
-@app.get("/secure-data")
+    return jsonify({"error": "Invalid credentials"}), 401
+
+
+@app.route("/secure-data", methods=["GET"])
 @jwt_required()
-def secure_data():
+def secure():
     return jsonify({"data": "This is protected info."})
 
+
 if __name__ == "__main__":
+    # Start Prometheus metrics endpoint on port 9200
+    start_http_server(9200)
     app.run(host="0.0.0.0", port=5005)

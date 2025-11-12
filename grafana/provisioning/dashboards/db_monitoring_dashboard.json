@@ -1,18 +1,82 @@
 {
   "id": null,
-  "title": "DB Monitoring Dashboard",
-  "time": { "from": "now-15m", "to": "now" },
+  "title": "Project Monitoring Dashboard",
+  "tags": ["monitoring", "db", "auth", "generator"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
   "panels": [
     {
-      "type": "timeseries",
+      "type": "graph",
       "title": "Operation Duration (ms)",
       "targets": [
         {
           "expr": "operation_duration_ms",
-          "legendFormat": "duration"
+          "legendFormat": "operation_duration_ms",
+          "refId": "A"
         }
       ],
-      "datasource": "Prometheus"
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "Login Attempts Rate (per min)",
+      "targets": [
+        {
+          "expr": "rate(auth_login_attempts_total[1m])",
+          "legendFormat": "login_attempts_rate",
+          "refId": "B"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "Successful Logins",
+      "targets": [
+        {
+          "expr": "auth_successful_logins_total",
+          "legendFormat": "successful_logins",
+          "refId": "C"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }
+    },
+    {
+      "type": "stat",
+      "title": "Registered Users (Auth)",
+      "targets": [
+        {
+          "expr": "auth_registered_users_total",
+          "refId": "D"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "Postgres Active Connections",
+      "targets": [
+        {
+          "expr": "pg_stat_activity_count",
+          "legendFormat": "active_connections",
+          "refId": "E"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "Generator CPU Usage",
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total{job=\"generator\"}[1m])",
+          "legendFormat": "CPU",
+          "refId": "F"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 }
     }
   ]
 }

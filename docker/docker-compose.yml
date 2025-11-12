@@ -1,6 +1,7 @@
 version: "3.9"
 
 services:
+
   postgres_db:
     image: postgres:14
     container_name: postgres_db
@@ -10,6 +11,25 @@ services:
       POSTGRES_DB: test_db
     ports:
       - "5434:5432"
+
+  generator:
+    build:
+      context: ../data_generator
+      dockerfile: Dockerfile.generator
+    container_name: generator
+    depends_on:
+      - postgres_db
+    ports:
+      - "9100:9100"
+
+  auth_service:
+    build:
+      context: ../auth_service
+      dockerfile: Dockerfile.auth
+    container_name: auth_service
+    ports:
+      - "5005:5005"
+      - "9200:9200"
 
   prometheus:
     image: prom/prometheus
@@ -24,25 +44,3 @@ services:
     container_name: grafana
     ports:
       - "3030:3000"
-    volumes:
-      - ../grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
-      - ../grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
-      - ../grafana/provisioning/dashboards:/var/lib/grafana/dashboards
-
-  auth_service:
-    build:
-      context: ../auth_service
-      dockerfile: Dockerfile.auth
-    container_name: auth_service
-    ports:
-      - "5005:5005"
-
-  generator:
-    build:
-      context: ../data_generator
-      dockerfile: Dockerfile.generator
-    container_name: generator
-    depends_on:
-      - postgres_db
-    ports:
-      - "9100:9100"

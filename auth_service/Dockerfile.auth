@@ -2,9 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY auth_server.py /app/
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install flask flask_jwt_extended
+COPY auth_server.py .
+COPY users.db .
 
 EXPOSE 5005
 
