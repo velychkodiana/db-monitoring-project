@@ -164,7 +164,7 @@ scrape_configs:
 ![Grafana Dashboard](screenshots/grafana1.png)
 ![Grafana Dashboard](screenshots/grafana2.png)
 ![Prometheus Targets](screenshots/prometheus.png)
-```
+
 
 ## Виконані умови
 
@@ -175,6 +175,7 @@ scrape_configs:
 ✅ Моніторинг охоплює логіни, користувачів, операції та стан БД
 
 ---
+
 **Автор:** *Diana Velycho*
 **Рік:** 2025
 
