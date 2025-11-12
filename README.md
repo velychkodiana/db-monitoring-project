@@ -144,6 +144,7 @@ scrape_configs:
 ## Grafana Dashboard
 
 **Назва:** `Project Monitoring Dashboard`
+---
 **Оновлення:** кожні 5 секунд
 
 ### Відображає:
@@ -166,7 +167,6 @@ scrape_configs:
 ```
 
 
----
 
 ## Виконані умови
 
