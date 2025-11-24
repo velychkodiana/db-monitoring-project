@@ -209,8 +209,6 @@ Simulator:
 
 ## Screenshots
 
-(додайте файли у папку 📁 `screenshots/`)
-
 ```
 ![Grafana Dashboard 1](screenshots/grafana1.png)
 ![Grafana Dashboard 2](screenshots/grafana2.png)
