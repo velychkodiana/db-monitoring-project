@@ -1,38 +1,33 @@
 # Database Monitoring Project
 
-Моніторингова система, побудована на Docker, що об’єднує **PostgreSQL**, **Prometheus**, **Grafana**, **Flask Auth Service** і **Data Generator**.  
-Проєкт дозволяє в реальному часі **збирати, аналізувати та візуалізувати метрики** з усіх сервісів.
+Моніторингова система, побудована на Docker, що об’єднує **PostgreSQL**, **Postgres Exporter**, **Prometheus**, **Grafana**, **Flask Auth Service** і **Data Generator**.
+Проєкт дозволяє в режимі реального часу **збирати, аналізувати та візуалізувати метрики** з усіх сервісів — бази даних, сервісу авторизації, генератора даних та системного рівня.
 
 ---
 
-##  Архітектура
+## Архітектура
 
 ```
-
-┌──────────────────────────────────────────┐
-│             Grafana (3030)               │
-│     └── підключена до Prometheus ────────┤
-│             ↑                            │
-│        Prometheus (9099)                 │
-│     ├── збирає метрики з:                │
-│     │   • generator:9100                 │
-│     │   • auth_service:9200              │
-│     │   • postgres_db                    │
-│             ↑                            │
-│        Data Generator                    │
-│     └── записує дані в PostgreSQL        │
-│             ↑                            │
-│        PostgreSQL (5434)                 │
-└──────────────────────────────────────────┘
-
+┌───────────────────────────────────────────────┐
+│                   Grafana (3030)              │
+│                 └── dashboard                 │
+│                         ↑                     │
+│                Prometheus (9099)              │
+│        ┌───────────────┼──────────────────┐   │
+│        │               │                  │   │
+│ generator:9100   auth_service:9200   postgres_exporter:9187
+│   ↑ (insert)             ↑ (login)              ↑ (DB metrics)
+│                      Auth Service (5005)        │
+│                           ↑                     │
+│                     PostgreSQL (5434)           │
+└───────────────────────────────────────────────┘
 ```
 
 ---
 
-##  Структура проєкту
+## Структура проєкту
 
 ```
-
 db-monitoring-project/
 ├── auth_service/
 │   ├── Dockerfile.auth
@@ -46,12 +41,15 @@ db-monitoring-project/
 ├── grafana/
 │   └── provisioning/
 │       ├── dashboards/
-│       │   └── db_monitoring_dashboard.json
+│       │   └── project_dashboard.json
 │       └── datasources/
 │           └── datasource.yml
 │
 ├── prometheus/
 │   └── prometheus.yml
+│
+├── postgres/
+│   └── init.sql
 │
 ├── docker/
 │   └── docker-compose.yml
@@ -60,66 +58,81 @@ db-monitoring-project/
 │   └── traffic_simulator.py
 │
 └── README.md
-
-````
+```
 
 ---
 
 ##  Використані технології
 
-| Компонент | Опис |
-|------------|------|
-| **Python + Flask** | REST API для Auth Service |
-| **PostgreSQL** | Зберігання даних |
-| **Prometheus** | Збір метрик |
-| **Grafana** | Візуалізація показників |
-| **Docker Compose** | Оркестрація контейнерів |
-| **Prometheus Client Library** | Експорт метрик з Python |
+| Компонент                    | Опис                      |
+| ---------------------------- | ------------------------- |
+| **Python + Flask**           | Реалізація Auth Service   |
+| **PostgreSQL**               | Основна база даних        |
+| **Postgres Exporter**        | Метрики Postgres          |
+| **Prometheus**               | Збір та агрегація метрик  |
+| **Grafana**                  | Візуалізація              |
+| **Docker Compose**           | Оркестрація               |
+| **Prometheus Python Client** | Експорт метрик з сервісів |
 
 ---
 
 ## Запуск
 
+###  Клонувати репозиторій
+
 ```bash
-# Клонування репозиторію
 git clone https://github.com/yourusername/db-monitoring-project.git
 cd db-monitoring-project/docker
+```
 
-# Запуск контейнерів
+### Запустити весь стек
+
+```bash
 docker compose up -d --build
+```
 
-# Перевірка запущених контейнерів
+### Перевірити статус
+
+```bash
 docker ps --format "table {{.Names}}\t{{.Ports}}"
+```
 
-# Зупинка контейнерів
+### Зупинити
+
+```bash
 docker compose down
-````
-
-**Порти сервісів:**
-
-| Сервіс       | Порт        | Призначення         |
-| ------------ | ----------- | ------------------- |
-| Grafana      | 3030        | Інтерфейс дашбордів |
-| Prometheus   | 9099        | Збір метрик         |
-| Generator    | 9100        | Метрики операцій    |
-| Auth Service | 5005 / 9200 | API та метрики      |
-| PostgreSQL   | 5434        | Сховище даних       |
+```
 
 ---
 
-## Основні Endpoints
+##  Порти сервісів
 
-| Endpoint                        | Опис                      |
-| ------------------------------- | ------------------------- |
-| `http://localhost:9100/metrics` | Метрики Data Generator    |
-| `http://localhost:9200/metrics` | Метрики Auth Service      |
-| `http://localhost:9099/targets` | Список Prometheus targets |
-| `http://localhost:3030`         | Веб-інтерфейс Grafana     |
-| `http://localhost:5005/login`   | Flask API авторизації     |
+| Сервіс            | Порт            | Значення           |
+| ----------------- | --------------- | ------------------ |
+| Grafana           | **3030**        | Панель моніторингу |
+| Prometheus        | **9099**        | Метрики            |
+| Generator         | **9100**        | Метрики генератора |
+| Auth Service      | **5005 / 9200** | API та метрики     |
+| Postgres          | **5434**        | База даних         |
+| Postgres Exporter | **9187**        | Метрики PostgreSQL |
 
 ---
 
-## Конфігурація Prometheus
+##  Основні Endpoints
+
+| Endpoint                         | Опис                   |
+| -------------------------------- | ---------------------- |
+| `http://localhost:9100/metrics`  | Метрики Data Generator |
+| `http://localhost:9200/metrics`  | Метрики Auth Service   |
+| `http://localhost:9187/metrics`  | Метрики PostgreSQL     |
+| `http://localhost:9099/targets`  | Target-стан Prometheus |
+| `http://localhost:3030`          | Grafana                |
+| `http://localhost:5005/register` | Реєстрація             |
+| `http://localhost:5005/login`    | Авторизація            |
+
+---
+
+##  Конфігурація Prometheus
 
 ```yaml
 global:
@@ -137,45 +150,90 @@ scrape_configs:
   - job_name: "auth_service"
     static_configs:
       - targets: ["auth_service:9200"]
+
+  - job_name: "postgres_exporter"
+    static_configs:
+      - targets: ["postgres_exporter:9187"]
 ```
 
 ---
 
-## Grafana Dashboard
+##  Grafana Dashboard
 
 **Назва:** `Project Monitoring Dashboard`
----
 **Оновлення:** кожні 5 секунд
 
-### Відображає:
+### Відображає метрики:
 
-* ⏱ **operation_duration_ms** — середня тривалість операцій
-* 🔐 **auth_login_attempts_total** — кількість спроб логіну
-* ✅ **auth_successful_logins_total** — успішні входи
-* 👥 **auth_registered_users_total** — зареєстровані користувачі
-* 💾 **pg_stat_activity_count** — активні з’єднання PostgreSQL
-* ⚙️ **process_cpu_seconds_total** — CPU генератора
+###  Data Generator
+
+* `operation_duration_ms`
+* histogram `operation_duration_hist_ms`
+* `operations_total`
+* `db_table_size_bytes`
+
+###  Auth Service
+
+* `auth_registered_users_total`
+* `auth_login_attempts_total`
+* `auth_successful_logins_total`
+
+###  PostgreSQL
+
+* `pg_stat_activity_count`
+* `pg_database_size`
+
+###  System
+
+* CPU generator (`process_cpu_seconds_total`)
+* Memory usage
 
 ---
 
-##  Screenshots
+##  Traffic Simulator
 
+Для генерації навантаження:
 
-![Grafana Dashboard](screenshots/grafana1.png)
-![Grafana Dashboard](screenshots/grafana2.png)
+```bash
+cd db-monitoring-project
+python3 tools/traffic_simulator.py --duration 20 --users 50 --threads 10
+```
+
+Simulator:
+
+* створює користувачів через `/register`
+* виконує паралельні логіни через `/login`
+* додає інформації на графіки Grafana
+
+---
+
+## Screenshots
+
+(додайте файли у папку 📁 `screenshots/`)
+
+```
+![Grafana Dashboard 1](screenshots/grafana1.png)
+![Grafana Dashboard 2](screenshots/grafana2.png)
 ![Prometheus Targets](screenshots/prometheus.png)
-
-
-## Виконані умови
-
-* ✅ Контейнери PostgreSQL, Prometheus, Grafana, Auth Service, Generator
-* ✅ Prometheus збирає всі метрики
-* ✅ Grafana показує 4+ графіки у дашборді
-* ✅ Дані оновлюються в реальному часі
-* ✅ Моніторинг охоплює логіни, користувачів, операції та стан БД
+```
 
 ---
 
-**Автор:** *Diana Velycho*
-**Рік:** 2025
+##  Виконані вимоги
 
+* Контейнери **PostgreSQL, Prometheus, Grafana, Generator, Auth Service**
+* Метрики з усіх компонентів успішно збираються
+* Створений **великий Grafana Dashboard** з 6+ графіками
+* Дані оновлюються в реальному часі
+* Присутній **Traffic Simulator**
+* Реєстрація та логіни генерують навантаження
+* Метрики коректно відображаються в Grafana
+
+---
+
+##  Автор
+
+**Diana Velycho**
+2025
+
+---
