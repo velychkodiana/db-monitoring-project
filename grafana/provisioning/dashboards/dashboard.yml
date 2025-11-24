@@ -1,8 +1,9 @@
 apiVersion: 1
 
 providers:
-  - name: 'DB-Monitoring'
+  - name: 'project-monitoring'
     orgId: 1
+    folder: 'Monitoring'
     type: file
     disableDeletion: false
     editable: true
