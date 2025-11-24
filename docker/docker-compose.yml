@@ -11,6 +11,24 @@ services:
       POSTGRES_DB: test_db
     ports:
       - "5434:5432"
+    networks:
+      - monitoring_network
+    volumes:
+      - ../postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  postgres_exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter
+    container_name: postgres_exporter
+    environment:
+      DATA_SOURCE_URI: "postgres_db:5432/test_db?sslmode=disable"
+      DATA_SOURCE_USER: "test_user"
+      DATA_SOURCE_PASS: "test_password"
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres_db
+    networks:
+      - monitoring_network
 
   generator:
     build:
@@ -21,6 +39,8 @@ services:
       - postgres_db
     ports:
       - "9100:9100"
+    networks:
+      - monitoring_network
 
   auth_service:
     build:
@@ -30,6 +50,8 @@ services:
     ports:
       - "5005:5005"
       - "9200:9200"
+    networks:
+      - monitoring_network
 
   prometheus:
     image: prom/prometheus
@@ -38,9 +60,21 @@ services:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9099:9090"
+    networks:
+      - monitoring_network
 
   grafana:
     image: grafana/grafana
     container_name: grafana
     ports:
       - "3030:3000"
+    networks:
+      - monitoring_network
+    volumes:
+      - ../grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ../grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ../grafana/dashboards:/var/lib/grafana/dashboards
+
+networks:
+  monitoring_network:
+    driver: bridge
