@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir flask prometheus_client werkzeug
 # Копіюємо код автентифікації
 COPY auth_server.py /app/
 
-# (опційно) якщо хочеш мати початковий users.db з репозиторію:
+# початковий users.db з репозиторію (за необхідності):
 # COPY users.db /app/users.db
 
 EXPOSE 5005
