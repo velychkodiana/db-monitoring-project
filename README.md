@@ -209,11 +209,11 @@ Simulator:
 
 ## Screenshots
 
-```
+
 ![Grafana Dashboard 1](screenshots/grafana1.png)
 ![Grafana Dashboard 2](screenshots/grafana2.png)
 ![Prometheus Targets](screenshots/prometheus.png)
-```
+
 
 ---
 
