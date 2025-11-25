@@ -1,111 +1,165 @@
-from flask import Flask, request, jsonify
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required
-import sqlite3
-from prometheus_client import start_http_server, Counter, Gauge
-import time
 import os
+import sqlite3
+from flask import Flask, request, jsonify, g
+from werkzeug.security import generate_password_hash, check_password_hash
+from prometheus_client import Counter, start_http_server
 
+DB_PATH = os.path.join(os.path.dirname(__file__), "users.db")
+
+# -------- Prometheus metrics --------
+auth_registered_users_total = Counter(
+    "auth_registered_users_total", "Total number of registered users"
+)
+auth_login_attempts_total = Counter(
+    "auth_login_attempts_total", "Total number of login attempts"
+)
+auth_successful_logins_total = Counter(
+    "auth_successful_logins_total", "Total number of successful logins"
+)
+
+# -------- Flask app --------
 app = Flask(__name__)
-app.config["JWT_SECRET_KEY"] = "supersecret"
-jwt = JWTManager(app)
-
-# === Prometheus Metrics ===
-login_attempts = Counter("auth_login_attempts_total", "Total login attempts")
-successful_logins = Counter("auth_successful_logins_total", "Successful logins")
-registered_users_gauge = Gauge("auth_registered_users_total", "Total number of registered users")
-
-DB_PATH = "/app/users.db" if os.path.exists("/app") else "users.db"
 
 
-# Create table if not exists
+def get_db():
+    """Return a SQLite connection bound to current request context."""
+    if "db" not in g:
+        g.db = sqlite3.connect(DB_PATH)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(exc):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
+
+
 def init_db():
+    """Create users table if it does not exist."""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("""
+    cur.execute(
+        """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password TEXT
-        )
-    """)
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
     conn.commit()
     conn.close()
 
 
-init_db()
+@app.route("/")
+def index():
+    return jsonify({"status": "ok", "message": "Auth service is running"}), 200
 
 
-def count_users():
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM users")
-    count = cur.fetchone()[0]
-    conn.close()
-    return count
-
-
-@app.before_request
-def update_metrics():
-    registered_users_gauge.set(count_users())
-
-
-
-#   REGISTER USER
-
-@app.route("/register", methods=["POST"])
+# ---------- REGISTER ----------
+@app.route("/register", methods=["GET", "POST"])
 def register():
-    data = request.get_json()
-    username = data.get("username")
-    password = data.get("password")
+    # Якщо просто відкриваєш в браузері - повертаємо просту HTML форму
+    if request.method == "GET":
+        return """
+        <html>
+        <body>
+            <h2>Register</h2>
+            <form method="post">
+              <label>Username: <input name="username" /></label><br/>
+              <label>Password: <input name="password" type="password" /></label><br/>
+              <button type="submit">Register</button>
+            </form>
+        </body>
+        </html>
+        """
 
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
+    # POST (з форми або JSON)
+    data = request.form if request.form else request.json
+
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
+
+    if not username or not password:
+        return jsonify({"error": "username and password are required"}), 400
+
+    db = get_db()
+    cur = db.cursor()
+
     try:
-        cur.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
-        conn.commit()
+        cur.execute(
+            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+            (username, generate_password_hash(password)),
+        )
+        db.commit()
     except sqlite3.IntegrityError:
-        conn.close()
-        return jsonify({"error": "User already exists"}), 400
+        return jsonify({"error": "User already exists"}), 409
 
-    conn.close()
-    return jsonify({"message": "User registered"}), 201
+    auth_registered_users_total.inc()
+
+    return jsonify({"status": "ok", "message": "User registered"}), 201
 
 
-
-# LOGIN
-@app.route("/login", methods=["POST"])
+# ---------- LOGIN ----------
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    login_attempts.inc()
+    # GET — проста форма для ручної перевірки
+    if request.method == "GET":
+        return """
+        <html>
+        <body>
+            <h2>Login</h2>
+            <form method="post">
+              <label>Username: <input name="username" /></label><br/>
+              <label>Password: <input name="password" type="password" /></label><br/>
+              <button type="submit">Login</button>
+            </form>
+        </body>
+        </html>
+        """
 
-    data = request.get_json()
-    username = data.get("username")
-    password = data.get("password")
+    auth_login_attempts_total.inc()
 
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
-    user = cur.fetchone()
-    conn.close()
+    data = request.form if request.form else request.json
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
 
-    if user:
-        successful_logins.inc()
-        token = create_access_token(identity=username)
-        return jsonify(access_token=token)
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
 
-    return jsonify({"error": "Invalid credentials"}), 401
+    if not username or not password:
+        return jsonify({"error": "username and password are required"}), 400
+
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+    row = cur.fetchone()
+
+    if not row or not check_password_hash(row["password_hash"], password):
+        return jsonify({"status": "error", "message": "Invalid credentials"}), 401
+
+    auth_successful_logins_total.inc()
+
+    # Тут можна видати токен, але для проєкту достатньо просто OK
+    return jsonify({"status": "ok", "message": "Login successful"}), 200
 
 
-#  SECURE ENDPOINT
+def main():
+    # БД та таблиця
+    init_db()
 
-@app.route("/secure-data", methods=["GET"])
-@jwt_required()
-def secure():
-    return jsonify({"data": "This is protected info."})
+    # Запускаємо окремий HTTP сервер для метрик на порту 9200
+    start_http_server(9200)
+
+    # Flask API на 5005 (доступний з docker-compose)
+    app.run(host="0.0.0.0", port=5005)
 
 
 if __name__ == "__main__":
-    # Prometheus metrics on port 9200
-    start_http_server(9200)
-
-    # Flask API on port 5005
-    app.run(host="0.0.0.0", port=5005)
+    main()

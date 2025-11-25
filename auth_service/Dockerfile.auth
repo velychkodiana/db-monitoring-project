@@ -2,12 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Встановлюємо залежності
+RUN pip install --no-cache-dir flask prometheus_client werkzeug
 
-COPY auth_server.py .
-COPY users.db .
+# Копіюємо код автентифікації
+COPY auth_server.py /app/
+
+# (опційно) якщо хочеш мати початковий users.db з репозиторію:
+# COPY users.db /app/users.db
 
 EXPOSE 5005
+EXPOSE 9200
 
 CMD ["python", "auth_server.py"]
