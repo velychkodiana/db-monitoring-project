@@ -62,7 +62,7 @@ def index():
 # ---------- REGISTER ----------
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    # Якщо просто відкриваєш в браузері - повертаємо просту HTML форму
+    # в браузері - повертає просту HTML форму
     if request.method == "GET":
         return """
         <html>
@@ -146,7 +146,7 @@ def login():
 
     auth_successful_logins_total.inc()
 
-    # Тут можна видати токен, але для проєкту достатньо просто OK
+   
     return jsonify({"status": "ok", "message": "Login successful"}), 200
 
 
